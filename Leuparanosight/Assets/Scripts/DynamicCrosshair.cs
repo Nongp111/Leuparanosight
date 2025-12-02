@@ -12,9 +12,11 @@ public class DynamicCrosshair : MonoBehaviour
 
     public RectTransform top, bottom, left, right;
 
+    [Header("Crosshair Spacing")]
     public float defaultSpacing = 20f;   // ระยะห่างปกติ
-    public float moveSpread = 15f;      // ระยะเพิ่มเมื่อเดิน
-    public float shootSpread = 25f;     // ระยะเพิ่มเมื่อยิง
+    public float moveSpread = 40f;      // ระยะเพิ่มเมื่อเดิน (เพิ่มค่าให้เห็นชัด)
+    public float sprintSpread = 70f;     // ระยะเพิ่มเมื่อวิ่ง (ค่าใหม่)
+    public float shootSpread = 50f;     // ระยะเพิ่มเมื่อยิง
     public float smoothSpeed = 10f;     // ความเร็วในการปรับ
 
     private float targetSpacing;
@@ -28,16 +30,28 @@ public class DynamicCrosshair : MonoBehaviour
 
     void Update()
     {
-        // ตัวอย่าง: ตรวจสอบ input
+        // ตรวจสอบสถานะต่างๆ
         bool isMoving = Input.GetAxis("Horizontal") != 0 || Input.GetAxis("Vertical") != 0;
+        bool isSprinting = isMoving && Input.GetKey(KeyCode.LeftShift); // เช็คว่าวิ่งหรือไม่ (เคลื่อนที่ + กด Shift)
         bool isShooting = Input.GetMouseButton(0);
 
+        // จัดลำดับความสำคัญ: ยิง > วิ่ง > เดิน > หยุดนิ่ง
         if (isShooting)
+        {
             targetSpacing = defaultSpacing + shootSpread;
+        }
+        else if (isSprinting)
+        {
+            targetSpacing = defaultSpacing + sprintSpread;
+        }
         else if (isMoving)
+        {
             targetSpacing = defaultSpacing + moveSpread;
+        }
         else
+        {
             targetSpacing = defaultSpacing;
+        }
 
         // ✅ คำนวณ "ลมหายใจ"
         float amplitude = isFocusing ? breathingAmplitude * 0.2f : breathingAmplitude;
@@ -58,7 +72,8 @@ public class DynamicCrosshair : MonoBehaviour
 
     public void SetSpread(float spread)
     {
-        // คูณค่าหน่อยให้ crosshair ขยายเห็นชัด
+        // ฟังก์ชันนี้อาจถูกเรียกจาก script อื่นและเขียนทับค่า targetSpacing
+        // หากปัญหายังคงอยู่หลังจากแก้ไขนี้ เราจะต้องตรวจสอบว่ามี script อื่นเรียกใช้ฟังก์ชันนี้หรือไม่
         targetSpacing = defaultSpacing + spread * 100f;
     }
 }

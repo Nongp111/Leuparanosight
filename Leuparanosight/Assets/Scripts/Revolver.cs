@@ -27,9 +27,11 @@ public class Revolver : MonoBehaviour
 
     [Header("Accuracy Settings")]
     public float baseSpread = 0.01f;     // spread ปกติ
-    public float moveSpread = 0.05f;
+    public float moveSpread = 0.05f;     // spread ตอนเดิน
+    public float runSpread = 0.1f;       // spread ตอนวิ่ง (เพิ่มเข้ามาใหม่)
     public float aimingSpread = 0.003f;  // spread ขณะ ADS (จะลดลง)
     public float currentSpread;          // updated runtime
+    public float spreadDecayRate = 5f;   // ความเร็วที่ spread จะลดลง
 
     [Header("ADS Settings")]
     public bool isAiming = false;
@@ -116,7 +118,28 @@ public class Revolver : MonoBehaviour
         weaponRoot.localRotation = Quaternion.Slerp(weaponRoot.localRotation, targetLocalRot, Time.deltaTime * aimSpeed);
 
         // Update current spread to use during Shoot()
-        currentSpread = isAiming ? aimingSpread : baseSpread;
+        // --- ส่วนที่แก้ไข ---
+        bool isWalking = Input.GetAxis("Vertical") != 0 || Input.GetAxis("Horizontal") != 0;
+        bool isRunning = isWalking && Input.GetKey(KeyCode.LeftShift);
+
+        float targetSpread;
+        if (isAiming)
+        {
+            targetSpread = aimingSpread; // ถ้ากำลังเล็ง ให้ใช้ค่า spread ที่แม่นยำที่สุดเสมอ
+        }
+        else if (isRunning)
+        {
+            targetSpread = runSpread; // ถ้าไม่ได้เล็ง และกำลังวิ่ง
+        }
+        else if (isWalking) 
+        {
+            targetSpread = moveSpread;
+        }
+        else
+        {
+            targetSpread = baseSpread; // ถ้าไม่ได้เล็ง และอยู่นิ่งๆ
+        }
+        currentSpread = Mathf.Lerp(currentSpread, targetSpread, Time.deltaTime * spreadDecayRate);
     }
 
     void Shoot()
@@ -132,6 +155,9 @@ public class Revolver : MonoBehaviour
         shootDir += fpsCam.transform.right * Random.Range(-currentSpread, currentSpread);
         shootDir += fpsCam.transform.up * Random.Range(-currentSpread, currentSpread);
         shootDir.Normalize();
+
+        // --- DEBUG: วาดเส้นแสดงทิศทางกระสุน ---
+        Debug.DrawRay(fpsCam.transform.position, shootDir * range, Color.red, 1.0f);
 
         if (Physics.Raycast(fpsCam.transform.position, shootDir, out RaycastHit hit, range))
         {

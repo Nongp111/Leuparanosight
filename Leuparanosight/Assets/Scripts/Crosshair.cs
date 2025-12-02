@@ -21,15 +21,16 @@ public class Crosshair : MonoBehaviour
     public RectTransform centerDot;
 
     [Header("Base Behavior")]
-    public float baseGap = 20f;           // ระยะห่างพื้นฐาน
+    public float baseGap = 40f;           // ระยะห่างพื้นฐาน (ปรับค่านี้เพื่อเพิ่มขนาดเป้าตอนอยู่นิ่ง)
     public float spreadToPixels = 1000f;  // คูณ spread จากปืน
     public float swayToPixels = 200f;     // คูณ sway
     public float smoothSpeed = 10f;       // ความนุ่มนวลของการเคลื่อนไหว
 
     [Header("Dynamic Behavior")]
-    public float moveExpand = 15f;        // ขยายเมื่อเดิน
-    public float runExpand = 25f;         // ขยายเมื่อวิ่ง
-    public float shootExpand = 20f;       // ขยายตอนยิง
+    public float moveExpand = 600f;        // ขยายเมื่อเดิน 
+    public float runExpand = 800f;        // ขยายเมื่อวิ่ง 
+    public float shootExpand = 50f;       // ขยายตอนยิง
+    public float moveExpandSpeed = 8f;    // ความเร็วในการขยาย/หดตัว
     public float speedThreshold = 0.1f;   // ความเร็วขั้นต่ำที่ถือว่า “เดิน”
     public float runThreshold = 5f;       // ความเร็วที่ถือว่า “วิ่ง”
 
@@ -83,6 +84,7 @@ public class Crosshair : MonoBehaviour
         }
 
         // 🔹 คำนวณ spread จากปืน
+        // กลับมาใช้ spread จากปืนโดยตรง แต่ต้องแน่ใจว่าค่าเริ่มต้นของ revolver.currentSpread เป็น 0
         float spread = (revolver != null) ? revolver.currentSpread : 0f;
         float spreadPixels = baseGap + spread * spreadToPixels;
 
@@ -100,20 +102,25 @@ public class Crosshair : MonoBehaviour
         if (playerController != null)
         {
             float speed = playerController.velocity.magnitude;
-
-            // เดิน
-            if (speed > speedThreshold && speed < runThreshold)
-                targetMoveExpand = moveExpand;
+            bool isPressingMoveKeys = Input.GetAxis("Vertical") != 0 || Input.GetAxis("Horizontal") != 0;
+            bool isRunning = isPressingMoveKeys && Input.GetKey(KeyCode.LeftShift); // ตรวจสอบจากการกดปุ่มโดยตรง
 
             // วิ่ง
-            else if (speed >= runThreshold)
+            if (isRunning)
+            {
                 targetMoveExpand = runExpand;
+            }
+            // เดิน
+            else if (isPressingMoveKeys) // เปลี่ยนมาใช้การกดปุ่มโดยตรง
+            {
+                targetMoveExpand = moveExpand;
+            }
         }
         
-        currentMoveExpand = Mathf.Lerp(currentMoveExpand, targetMoveExpand, Time.deltaTime * 5f);
+        currentMoveExpand = Mathf.Lerp(currentMoveExpand, targetMoveExpand, Time.deltaTime * moveExpandSpeed);
 
         // ใช้ค่าที่ลื่นแทนค่าคงที่
-        float moveExpandValue = currentMoveExpand;
+        float finalMoveExpand = currentMoveExpand;
 
         // 🔹 ตรวจยิง (Input หรือเช็คจาก revolver ก็ได
         if (Input.GetMouseButtonDown(0))
@@ -124,7 +131,7 @@ public class Crosshair : MonoBehaviour
 
         if (isShooting)
         {
-            moveExpandValue += shootExpand;
+            finalMoveExpand += shootExpand; // บวกค่าขยายตอนยิงเข้าไป
             shootExpandTimer -= Time.deltaTime;
             if (shootExpandTimer <= 0f)
                 isShooting = false;
@@ -134,7 +141,10 @@ public class Crosshair : MonoBehaviour
         float breathing = Mathf.Sin(Time.time * breathingSpeed) * breathingAmplitude;
 
         // 🔹 รวมค่า crosshair gap ทั้งหมด
-        float finalGap = spreadPixels * aimMultiplier + moveExpandValue + breathing;
+        // แยกการคำนวณเพื่อให้ค่า move/run expand มีผลโดยตรงมากขึ้น
+        float gapFromSpread = spreadPixels * aimMultiplier;
+        float gapFromMovement = finalMoveExpand * aimMultiplier;
+        float finalGap = gapFromSpread + gapFromMovement + breathing;
 
         // 🔹 ตั้งเป้าหมายตำแหน่ง
         targetLeftPos = new Vector2(-finalGap, 0) + swayPixels;
@@ -156,6 +166,9 @@ public class Crosshair : MonoBehaviour
             float targetScale = aiming ? 0.6f : 1f;
             centerDot.localScale = Vector3.Lerp(centerDot.localScale, Vector3.one * targetScale, Time.deltaTime * smoothSpeed);
         }
+
+        // --- DEBUG LOGS ---
+        Debug.Log($"FinalGap: {finalGap}");
     }
 
     void SetCrosshairVisible(bool visible)
